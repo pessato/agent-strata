@@ -109,8 +109,12 @@ enumeration). The collector targets, at minimum:
 - **Slash commands & Skills** — project / user / plugin.
 - **MCP servers** — `.mcp.json` (project), `~/.claude.json` (user), plugin.
 - **Hooks** — all sources and events.
-- **Plugins & marketplaces** — enabled plugins, `extraKnownMarketplaces`.
+- **Plugins & marketplaces** — enabled plugins, `extraKnownMarketplaces`, and
+  every plugin **component**: skills, commands, agents, hooks, `.mcp.json`,
+  `.lsp.json` (language servers), `output-styles/`, `monitors/`, `bin/`
+  (PATH additions), and the plugin's default `settings.json`.
 - **Output styles, Keybindings, Status line.**
+- **Worktree config** — `.worktreeinclude` (files copied into new worktrees).
 - **Environment variables** — `ANTHROPIC_*`, `CLAUDE_*`, timeouts, legacy
   toggles, actually present in the environment.
 
@@ -141,7 +145,11 @@ Left sidebar navigation → main content pane. Sections:
 
 - **Scalars** (model, outputStyle, …): highest-precedence scope wins; losers
   recorded as overrides with their source.
-  Precedence (high → low): Managed → CLI → Project-local → Project-shared → User.
+  Precedence (high → low): Managed → CLI → Project-local → Project-shared →
+  User → **Plugin defaults**. Plugin-shipped `settings.json` values act as the
+  lowest layer of defaults (applied only where no user/project/managed value
+  exists). Exact plugin-vs-user ordering to be re-verified during
+  implementation.
 - **Objects** (env, hooks config): deep-merge; provenance tracked per key.
 - **Arrays** (permissions allow/deny/ask): **union** across scopes; each entry
   tagged with its source. Managed `deny` flagged as un-overridable.
