@@ -16,8 +16,9 @@ export function mergeConfig(layers) {
 
   const leaves = [];
   for (const [path, slot] of byPath) {
-    if (slot.isArray) continue; // arrays handled in Task 4
-    leaves.push(mergeScalar(path, slot.occurrences));
+    leaves.push(slot.isArray
+      ? mergeArray(path, slot.occurrences)
+      : mergeScalar(path, slot.occurrences));
   }
 
   const effective = rebuildEffective(leaves);
@@ -29,6 +30,24 @@ function mergeScalar(path, occurrences) {
   const win = sorted[0];
   const overrides = sorted.slice(1).map(o => ({ scope: o.scope, value: o.value, source: o.source }));
   return { path, type: 'scalar', winner: win.scope, value: win.value, locked: win.scope === 'managed', overrides };
+}
+
+function mergeArray(path, occurrences) {
+  const isDeny = path.endsWith('.deny');
+  const seen = new Map(); // json(value) → entry (kept = strongest scope)
+  // Strongest first so the first writer of a value wins the dedupe.
+  const sorted = [...occurrences].sort((a, b) => rank(a.scope) - rank(b.scope));
+  for (const occ of sorted) {
+    for (const value of occ.value) {
+      const key = JSON.stringify(value);
+      if (seen.has(key)) continue;
+      seen.set(key, {
+        value, scope: occ.scope, source: occ.source,
+        locked: isDeny && occ.scope === 'managed',
+      });
+    }
+  }
+  return { path, type: 'array', winner: null, entries: [...seen.values()] };
 }
 
 // Build a nested object from scalar/array leaf effective values.
