@@ -1,0 +1,146 @@
+import { esc } from './html.js';
+import { renderMergedRows, renderStrata } from './sections.js';
+
+// CSS copied verbatim from docs/reference/design-mockup.html lines 8–118
+const STYLES = `
+  :root{
+    --bg:#0b0c10; --panel:#121319; --panel2:#171922; --line:#232634;
+    --txt:#e7e8ee; --dim:#9aa0b0; --faint:#5a6072;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    /* scope language */
+    --managed:#ef4444; --cli:#f97316; --plocal:#eab308;
+    --pshared:#22c55e; --user:#3b82f6; --plugin:#a855f7;
+    --accent:#5eead4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 80% -10%,#15171f 0%,var(--bg) 55%);
+    color:var(--txt);font-family:var(--sans);font-size:14px;line-height:1.5}
+  a{color:inherit}
+  .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+
+  /* sidebar */
+  .side{border-right:1px solid var(--line);padding:20px 16px;position:sticky;top:0;height:100vh;
+    background:linear-gradient(180deg,var(--panel) 0%,var(--bg) 100%)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px;margin-bottom:4px}
+  .brand .dot{width:9px;height:9px;border-radius:50%;
+    background:conic-gradient(var(--managed),var(--cli),var(--plocal),var(--pshared),var(--user),var(--plugin),var(--managed));
+    box-shadow:0 0 12px #5eead455}
+  .brand b{font-size:15px}
+  .brand small{display:block;color:var(--faint);font-weight:500;font-size:11px;margin-left:18px;margin-top:-2px}
+  .nav{margin-top:22px;display:flex;flex-direction:column;gap:2px}
+  .nav a{padding:7px 10px;border-radius:8px;color:var(--dim);text-decoration:none;font-size:13px;
+    display:flex;align-items:center;gap:9px;transition:.15s}
+  .nav a:hover{background:var(--panel2);color:var(--txt)}
+  .nav a.on{background:linear-gradient(90deg,#1c2030,transparent);color:var(--txt);
+    box-shadow:inset 2px 0 0 var(--accent)}
+  .nav .star{color:#5eead4}
+  .legend{margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
+  .legend .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  .scope{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);margin:7px 0}
+  .chip{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-family:var(--mono);
+    font-size:10px;font-weight:700;color:#0b0c10}
+  .c-managed{background:var(--managed)} .c-cli{background:var(--cli)} .c-plocal{background:var(--plocal)}
+  .c-pshared{background:var(--pshared)} .c-user{background:var(--user)} .c-plugin{background:var(--plugin)}
+
+  /* main */
+  .main{padding:30px 38px 60px;max-width:980px}
+  .top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+  .top h1{font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:0}
+  .meta{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:right;line-height:1.7}
+  .meta b{color:var(--dim);font-weight:600}
+
+  /* overview hero: strata */
+  .hero{margin:20px 0 40px;background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--line);border-radius:16px;padding:26px 28px;position:relative;overflow:hidden}
+  .hero h2{margin:0 0 2px;font-size:20px}
+  .hero p{margin:0 0 22px;color:var(--dim);font-size:13px}
+  .strata{display:flex;flex-direction:column;gap:8px}
+  .layer{display:flex;align-items:center;gap:14px}
+  .layer .name{width:120px;font-size:12px;color:var(--dim);text-align:right;font-family:var(--mono)}
+  .layer .bar{flex:1;height:34px;border-radius:8px;position:relative;display:flex;align-items:center;
+    padding:0 12px;font-size:11px;font-family:var(--mono);color:#0b0c10;font-weight:600;
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset}
+  .layer .count{margin-left:auto;background:#0b0c1066;border-radius:20px;padding:1px 9px;color:#0b0c10}
+  .layer.absent .bar{background:repeating-linear-gradient(45deg,#1a1d27,#1a1d27 7px,#15171f 7px,#15171f 14px);
+    color:var(--faint);box-shadow:none;border:1px dashed var(--line)}
+  .summary{display:flex;gap:10px;margin-top:24px}
+  .stat{flex:1;background:#0e0f15;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat .n{font-size:24px;font-weight:700;font-family:var(--mono)}
+  .stat .k{font-size:11px;color:var(--faint);letter-spacing:.04em;margin-top:2px}
+
+  /* merged section */
+  .sec-h{display:flex;align-items:center;gap:12px;margin:34px 0 16px}
+  .sec-h h3{margin:0;font-size:16px}
+  .sec-h .pill{font-size:11px;color:#0b0c10;background:var(--accent);padding:2px 9px;border-radius:20px;font-weight:700}
+  .sec-h .expand{margin-left:auto;font-size:12px;color:var(--accent);cursor:pointer;font-family:var(--mono)}
+  .cat{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:22px 0 10px}
+
+  .row{display:flex;gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:10px;transition:.15s}
+  .row:hover{border-color:#2e3344}
+  /* the spine */
+  .spine{display:flex;flex-direction:column;gap:3px;padding-top:2px}
+  .rung{width:8px;height:8px;border-radius:2px;background:#262a38;position:relative}
+  .rung.win{box-shadow:0 0 9px currentColor;transform:scale(1.35);border-radius:2px}
+  .rung.over{opacity:.55}
+  .rung.none{background:transparent;border:1px solid #262a38}
+  .r-managed.win,.r-managed.over{background:var(--managed);color:var(--managed)}
+  .r-cli.win,.r-cli.over{background:var(--cli);color:var(--cli)}
+  .r-plocal.win,.r-plocal.over{background:var(--plocal);color:var(--plocal)}
+  .r-pshared.win,.r-pshared.over{background:var(--pshared);color:var(--pshared)}
+  .r-user.win,.r-user.over{background:var(--user);color:var(--user)}
+  .r-plugin.win,.r-plugin.over{background:var(--plugin);color:var(--plugin)}
+
+  .rowbody{flex:1;min-width:0}
+  .keyline{display:flex;align-items:center;gap:10px}
+  .key{font-family:var(--mono);font-weight:700;font-size:13px}
+  .src{font-size:10px;font-family:var(--mono);padding:1px 7px;border-radius:5px;color:#0b0c10;font-weight:700}
+  .s-managed{background:var(--managed)} .s-user{background:var(--user)} .s-pshared{background:var(--pshared)}
+  .lock{font-size:10px;color:var(--managed);font-family:var(--mono)}
+  .val{font-family:var(--mono);font-size:13px;margin-top:7px;color:var(--txt)}
+  .val code{background:#0e0f15;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
+  .why{margin-top:9px;font-size:12px;color:var(--faint);font-family:var(--mono);cursor:pointer}
+  .why:hover{color:var(--dim)}
+  .overrides{margin-top:10px;border-left:2px solid var(--line);padding-left:12px;display:flex;flex-direction:column;gap:6px}
+  .ov{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .ov s{color:#6b7180}
+  .ov .from{opacity:.8}
+  /* permissions union */
+  .perm{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .tok{font-family:var(--mono);font-size:11px;background:#0e0f15;border:1px solid var(--line);
+    border-radius:7px;padding:3px 9px;display:flex;align-items:center;gap:7px}
+  .tok .b{width:7px;height:7px;border-radius:2px}
+  .b-user{background:var(--user)} .b-pshared{background:var(--pshared)} .b-plocal{background:var(--plocal)}
+  .b-managed{background:var(--managed)}
+  .footnote{margin-top:40px;color:var(--faint);font-size:11px;font-family:var(--mono);text-align:center}
+`;
+
+export function renderReport(inventory, merged) {
+  const { machine, scopes } = inventory;
+  const present = scopes.filter(s => s.present).length;
+  const overridden = merged.leaves.filter(l => l.type === 'scalar' && l.overrides.length).length;
+  const locked = merged.leaves.filter(l => l.locked || (l.entries ?? []).some(e => e.locked)).length;
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>claude-config-view — ${esc(machine.hostname)}</title>
+<style>${STYLES}</style></head><body>
+<main class="main">
+  <div class="top"><h1>Configuration snapshot</h1>
+    <div class="meta"><b>${esc(machine.hostname)}</b> · ${esc(machine.platform)}<br>${esc(machine.projectDir)}<br>${esc(machine.timestamp)}</div></div>
+  <section class="hero"><h2>What's stacked on this machine</h2>
+    <p>Six precedence layers, highest on top.</p>
+    ${renderStrata(scopes)}
+    <div class="summary">
+      <div class="stat"><div class="n">${present}</div><div class="k">scopes present</div></div>
+      <div class="stat"><div class="n">${merged.leaves.length}</div><div class="k">effective keys</div></div>
+      <div class="stat"><div class="n">${overridden}</div><div class="k">overridden</div></div>
+      <div class="stat"><div class="n">${locked}</div><div class="k">locked by policy</div></div>
+    </div></section>
+  <div class="sec-h"><h3>Merged session</h3><span class="pill">★ effective + provenance</span></div>
+  ${renderMergedRows(merged.leaves)}
+  <div class="footnote">read-only snapshot · nothing was written · re-run to refresh</div>
+</main></body></html>`;
+}
