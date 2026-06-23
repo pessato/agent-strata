@@ -1,0 +1,10 @@
+# Brainstorming visual-companion scratch (not part of the project)
+.superpowers/
+
+# Node
+node_modules/
+*.log
+
+# Generated reports (the tool's HTML output)
+*.report.html
+claude-config-report.html
