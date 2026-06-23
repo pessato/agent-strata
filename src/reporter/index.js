@@ -1,5 +1,6 @@
 import { esc } from './html.js';
 import { renderMergedRows, renderStrata } from './sections.js';
+import { renderSources } from './sources.js';
 
 // CSS copied verbatim from docs/reference/design-mockup.html lines 8–118
 const STYLES = `
@@ -114,6 +115,14 @@ const STYLES = `
   .tok .b{width:7px;height:7px;border-radius:2px}
   .b-user{background:var(--user)} .b-pshared{background:var(--pshared)} .b-plocal{background:var(--plocal)}
   .b-managed{background:var(--managed)} .b-cli{background:var(--cli)} .b-plugin{background:var(--plugin)}
+  /* non-settings source sections */
+  .srcsec{margin-bottom:6px}
+  .items{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+  .items.empty{color:var(--faint);font-family:var(--mono);font-size:12px;font-style:italic}
+  .item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:9px;padding:8px 12px;font-size:13px}
+  .item .il{font-family:var(--mono);font-weight:600;min-width:0;overflow-wrap:anywhere}
+  .item .id{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap;padding-left:10px}
   .footnote{margin-top:40px;color:var(--faint);font-size:11px;font-family:var(--mono);text-align:center}
 `;
 
@@ -142,6 +151,8 @@ export function renderReport(inventory, merged) {
     </div></section>
   <div class="sec-h"><h3>Merged session</h3><span class="pill">★ effective + provenance</span></div>
   ${renderMergedRows(merged.leaves)}
+  <div class="sec-h"><h3>All configured sources</h3><span class="pill">inventory</span></div>
+  ${renderSources(inventory.sources)}
   <div class="footnote">read-only snapshot · nothing was written · re-run to refresh</div>
 </main></body></html>`;
 }

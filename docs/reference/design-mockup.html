@@ -116,6 +116,14 @@
   .tok .b{width:7px;height:7px;border-radius:2px}
   .b-user{background:var(--user)} .b-pshared{background:var(--pshared)} .b-plocal{background:var(--plocal)}
   .b-managed{background:var(--managed)} .b-cli{background:var(--cli)} .b-plugin{background:var(--plugin)}
+  /* non-settings source sections */
+  .srcsec{margin-bottom:6px}
+  .items{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+  .items.empty{color:var(--faint);font-family:var(--mono);font-size:12px;font-style:italic}
+  .item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:9px;padding:8px 12px;font-size:13px}
+  .item .il{font-family:var(--mono);font-weight:600;min-width:0;overflow-wrap:anywhere}
+  .item .id{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap;padding-left:10px}
   .footnote{margin-top:40px;color:var(--faint);font-size:11px;font-family:var(--mono);text-align:center}
 </style>
 </head>

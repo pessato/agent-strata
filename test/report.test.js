@@ -18,3 +18,11 @@ test('renderReport produces a single self-contained HTML document', () => {
   assert.match(html, /model/);              // a merged row rendered
   assert.match(html, /mac/);                // machine meta
 });
+
+test('renderReport includes the collected-sources sections', () => {
+  const html = renderReport(inventory, merged);
+  assert.match(html, /All configured sources/);
+  assert.match(html, /Environment variables/);
+  assert.match(html, /ANTHROPIC_MODEL=opus/);   // env value surfaced
+  assert.match(html, /Memory/);                 // a source section header
+});
