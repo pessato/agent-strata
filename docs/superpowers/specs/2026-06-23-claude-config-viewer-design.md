@@ -141,6 +141,39 @@ Left sidebar navigation → main content pane. Sections:
 9. **Plugins**.
 10. **Keybindings**.
 
+## Visual design — "The Cascade"
+
+Approved aesthetic. Reference mockup: `docs/reference/design-mockup.html`.
+
+The organizing idea: configuration precedence *is* a cascade, so the visual
+language is built around it. Clarity and UX are the priority; the "fun" comes
+from making provenance instantly legible, not from decoration.
+
+- **Scope color language.** Every scope has one fixed color + one-letter code,
+  used consistently everywhere (legend, badges, spine, tokens):
+  Managed = red `M`, CLI = orange `C`, Project-local = amber `L`,
+  Project-shared = green `P`, User = blue `U`, Plugin defaults = violet `G`.
+  Learn it once; color = source for the rest of the report.
+- **Theme.** Dark "control-room" base, monospace for keys/values, teal accent.
+  A light theme is a possible later enhancement (not required for v1).
+- **Overview "strata".** The six precedence layers drawn stacked, highest on
+  top; solid where a scope is present, hatched where not configured — the
+  *shape* of the machine's config at a glance, plus summary stats (scopes
+  present / effective keys / overridden / locked).
+- **The stack spine** (signature element). A small vertical dot-ladder beside
+  every merged setting: the **winning** scope's rung glows; scopes that set a
+  value but lost are **dimmed** (the overrides); scopes that never set it are
+  **hollow**. Provenance is readable before any text.
+- **Setting row.** key + winning value (mono), source badge, optional `⛒ locked`
+  (managed/un-overridable), and a collapsed `N overrides ▸` revealing
+  struck-through losers with their source. Global "expand all".
+- **Permission arrays** render as a wrap of tokens, each dot-tagged by source,
+  to express the union-across-scopes rule visually.
+- **Reassurance.** Read-only footer: "nothing was written · re-run to refresh".
+
+The Reporter must produce all of this as a single self-contained HTML file
+(inlined CSS/JS/data, no external requests) so it opens on any device offline.
+
 ## Merge rules (in the engine)
 
 - **Scalars** (model, outputStyle, …): highest-precedence scope wins; losers
