@@ -28,3 +28,16 @@ test('effective rebuilds arrays as flat value lists', () => {
   const { effective } = mergeConfig(layers);
   assert.deepEqual(effective.permissions.allow, ['Bash(npm *)', 'Edit(src/**)']);
 });
+
+test('a scalar colliding with an array is treated as a single entry, not split into characters', () => {
+  const mixed = [
+    { scope: 'user', source: 'user', settings: { thing: 'scalar' } },
+    { scope: 'project-shared', source: 'proj', settings: { thing: ['arrayval'] } },
+  ];
+  const { leaves } = mergeConfig(mixed);
+  const thing = leaves.find(l => l.path === 'thing');
+  assert.equal(thing.type, 'array');
+  // The scalar 'scalar' must appear whole — never iterated as 's','c','a','l','r'.
+  const values = thing.entries.map(e => e.value);
+  assert.deepEqual(values, ['arrayval', 'scalar']); // stronger scope (project-shared) first
+});

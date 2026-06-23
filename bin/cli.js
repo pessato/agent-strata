@@ -2,6 +2,7 @@
 import { writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
+import { spawn } from 'node:child_process';
 import { collect } from '../src/collector/index.js';
 import { mergeConfig } from '../src/merge/index.js';
 import { renderReport } from '../src/reporter/index.js';
@@ -29,7 +30,21 @@ export function run(argv = process.argv.slice(2)) {
   const outPath = resolve(args.out);
   writeFileSync(outPath, html);
   console.log(`Wrote ${outPath}`);
+  if (args.open) openInBrowser(outPath);
   return outPath;
+}
+
+// Open a file in the OS default application, detached. Best-effort: failures are
+// non-fatal (the report is already written and its path was printed).
+export function openInBrowser(path, platform = process.platform) {
+  const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
+  try {
+    const child = spawn(cmd, [path], { stdio: 'ignore', detached: true, shell: platform === 'win32' });
+    child.on('error', () => {});
+    child.unref();
+  } catch {
+    // ignore — opening is a convenience, not a requirement
+  }
 }
 
 // Only run when invoked directly, not when imported by tests.

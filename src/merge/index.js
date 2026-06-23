@@ -38,7 +38,11 @@ function mergeArray(path, occurrences) {
   // Strongest first so the first writer of a value wins the dedupe.
   const sorted = [...occurrences].sort((a, b) => rank(a.scope) - rank(b.scope));
   for (const occ of sorted) {
-    for (const value of occ.value) {
+    // Tolerate a value that is a scalar in one layer and an array in another:
+    // treat a non-array occurrence as a single-element array so we never iterate
+    // a string character-by-character.
+    const values = Array.isArray(occ.value) ? occ.value : [occ.value];
+    for (const value of values) {
       const key = JSON.stringify(value);
       if (seen.has(key)) continue;
       seen.set(key, {

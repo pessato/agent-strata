@@ -97,6 +97,7 @@ const STYLES = `
   .key{font-family:var(--mono);font-weight:700;font-size:13px}
   .src{font-size:10px;font-family:var(--mono);padding:1px 7px;border-radius:5px;color:#0b0c10;font-weight:700}
   .s-managed{background:var(--managed)} .s-user{background:var(--user)} .s-pshared{background:var(--pshared)}
+  .s-cli{background:var(--cli)} .s-plocal{background:var(--plocal)} .s-plugin{background:var(--plugin)}
   .lock{font-size:10px;color:var(--managed);font-family:var(--mono)}
   .val{font-family:var(--mono);font-size:13px;margin-top:7px;color:var(--txt)}
   .val code{background:#0e0f15;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
@@ -112,7 +113,7 @@ const STYLES = `
     border-radius:7px;padding:3px 9px;display:flex;align-items:center;gap:7px}
   .tok .b{width:7px;height:7px;border-radius:2px}
   .b-user{background:var(--user)} .b-pshared{background:var(--pshared)} .b-plocal{background:var(--plocal)}
-  .b-managed{background:var(--managed)}
+  .b-managed{background:var(--managed)} .b-cli{background:var(--cli)} .b-plugin{background:var(--plugin)}
   .footnote{margin-top:40px;color:var(--faint);font-size:11px;font-family:var(--mono);text-align:center}
 `;
 
