@@ -64,6 +64,25 @@ test('all user-controlled values are HTML-escaped', () => {
   assert.match(html, /&lt;script&gt;/);
 });
 
+test('single-file sources without a scope field render with no badge and no throw', () => {
+  const html = renderSources({
+    keybindings: { path: '~/.claude/keybindings.json', present: true, parse: 'ok', data: {} },
+    worktreeInclude: { path: './.worktreeinclude', present: true, parse: 'ok', data: '.env\nnotes.md\n' },
+  });
+  assert.match(html, /Keybindings/);
+  assert.match(html, /custom/);
+  assert.match(html, /Worktree include/);
+  assert.match(html, /2 entries/);          // two non-blank lines
+});
+
+test('an MCP file present but with no mcpServers key collapses to the empty state', () => {
+  const html = renderSources({
+    mcp: [{ scope: 'user', label: '~/.claude.json', present: true, parse: 'ok', data: { other: 1 } }],
+  });
+  assert.match(html, /MCP servers/);
+  assert.match(html, /no MCP servers/);
+});
+
 test('renderSources is robust to missing/empty input (no throw)', () => {
   assert.doesNotThrow(() => renderSources());
   assert.doesNotThrow(() => renderSources({}));
