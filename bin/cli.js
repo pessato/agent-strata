@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { collect } from '../src/collector/index.js';
 import { mergeConfig } from '../src/merge/index.js';
 import { renderReport } from '../src/reporter/index.js';
@@ -47,5 +48,19 @@ export function openInBrowser(path, platform = process.platform) {
   }
 }
 
-// Only run when invoked directly, not when imported by tests.
-if (import.meta.url === `file://${process.argv[1]}`) run();
+// Run when invoked directly — including via a symlinked bin from `npm link` or a
+// global install — but not when imported by tests. Comparing resolved realpaths
+// handles the symlink case, where process.argv[1] is the symlink path while
+// import.meta.url is the resolved target. pathToFileURL encodes the path the same
+// way import.meta.url does (spaces, etc.).
+function invokedDirectly() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(entry)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) run();
