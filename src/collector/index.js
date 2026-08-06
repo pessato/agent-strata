@@ -1,40 +1,48 @@
 import { join } from 'node:path';
 import { hostname } from 'node:os';
-import { settingsPaths, sourceDirs, sourceFiles } from './paths.js';
 import { readJson, readText, listDir } from './readers.js';
-import { SCOPE_LABELS } from '../precedence.js';
+import { redactEnv } from '../redact.js';
 
-// collectSettings({platform, home, projectDir}) → { layers, scopes }
-export function collectSettings(ctx) {
-  const paths = settingsPaths(ctx);
+// collectSettings(ctx, provider) → { layers, scopes }
+// `scopes` is every precedence layer in order, present or not — the report shows
+// absent ones too, since "no project settings here" is itself the answer to a
+// lot of questions. `layers` is the subset that parsed and can actually merge.
+export function collectSettings(ctx, provider) {
+  const paths = provider.settingsPaths(ctx);
   const scopes = [];
   const layers = [];
 
-  for (const scope of ['managed', 'project-local', 'project-shared', 'user']) {
-    const path = paths[scope];
+  for (const id of provider.order) {
+    const virtual = provider.virtualScopes?.[id];
+    if (virtual) {
+      scopes.push({
+        scope: id, label: provider.labelOf(id), path: virtual.path,
+        present: false, parse: 'n/a', error: virtual.reason, settings: null,
+      });
+      continue;
+    }
+    if (!provider.fileScopes.includes(id)) continue;
+
+    const path = paths[id];
     const r = readJson(path);
-    scopes.push({ scope, label: SCOPE_LABELS[scope], path, present: r.present, parse: r.parse, error: r.error, settings: r.data });
+    scopes.push({
+      scope: id, label: provider.labelOf(id), path,
+      present: r.present, parse: r.parse, error: r.error, settings: r.data,
+    });
     if (r.parse === 'ok' && r.data && typeof r.data === 'object') {
-      layers.push({ scope, source: path, settings: r.data });
+      layers.push({ scope: id, source: path, settings: r.data });
     }
   }
-
-  // CLI flags: documented scope, not recoverable from a static run.
-  scopes.splice(1, 0, { scope: 'cli', label: SCOPE_LABELS.cli, path: '(session flags)', present: false, parse: 'n/a', error: 'CLI flags are per-session and not inspectable after start', settings: null });
 
   return { layers, scopes };
 }
 
-const ENV_PREFIXES = ['ANTHROPIC_', 'CLAUDE_', 'CLAUDECODE'];
-const ENV_EXACT = ['API_TIMEOUT_MS', 'BASH_DEFAULT_TIMEOUT_MS', 'MAX_THINKING_TOKENS',
-  'DISABLE_AUTOUPDATER', 'DISABLE_TELEMETRY', 'DISABLE_AUTOCOMPACT'];
-
-function pickEnv(env) {
+function pickEnv(env, { prefixes, exact }) {
   const out = {};
   for (const [k, v] of Object.entries(env)) {
-    if (ENV_PREFIXES.some(p => k.startsWith(p)) || ENV_EXACT.includes(k)) out[k] = v;
+    if (prefixes.some(p => k.startsWith(p)) || exact.includes(k)) out[k] = v;
   }
-  return out;
+  return redactEnv(out);
 }
 
 function dirItems(scope, dir) {
@@ -43,74 +51,55 @@ function dirItems(scope, dir) {
   }));
 }
 
-// collect({platform, home, projectDir, env}) → Inventory
-export function collect(ctx) {
-  const { layers, scopes } = collectSettings(ctx);
-  const dirs = sourceDirs(ctx);
-  const files = sourceFiles(ctx);
+const textItem = path => { const r = readText(path); return { present: r.present, parse: r.parse, error: r.error, data: r.data }; };
+const jsonItem = path => { const r = readJson(path); return { present: r.present, parse: r.parse, error: r.error, data: r.data }; };
+const safeHostname = () => { try { return hostname(); } catch { return 'unknown'; } };
 
-  const collectDirs = key => dirs[key].flatMap(d => dirItems(d.scope, d.path));
+// Hooks and plugins are declared inside settings rather than in their own files,
+// so they are read back out of the parsed layers instead of off disk.
+function fromLayers(layers, pick) {
+  const out = [];
+  for (const l of layers) {
+    for (const [label, data] of Object.entries(pick(l.settings) ?? {})) {
+      out.push({ scope: l.scope, label, path: l.source, present: true, parse: 'ok', error: null, data });
+    }
+  }
+  return out;
+}
 
-  const memory = [
-    { scope: 'user', label: '~/.claude/CLAUDE.md', path: files.userMemory, ...textItem(files.userMemory) },
-    { scope: 'project-shared', label: './CLAUDE.md', path: files.projectMemory, ...textItem(files.projectMemory) },
-    { scope: 'project-local', label: './CLAUDE.local.md', path: files.projectMemoryLocal, ...textItem(files.projectMemoryLocal) },
-  ];
+// collect({platform, home, projectDir, env}, provider) → Inventory
+export function collect(ctx, provider) {
+  const { layers, scopes } = collectSettings(ctx, provider);
+  const dirs = provider.sourceDirs(ctx);
+  const files = provider.sourceFiles(ctx);
 
-  const mcp = [
-    { scope: 'user', label: '~/.claude.json', path: files.userMcp, ...jsonItem(files.userMcp) },
-    { scope: 'project-shared', label: './.mcp.json', path: files.projectMcp, ...jsonItem(files.projectMcp) },
-  ];
+  const collectDirs = key => (dirs[key] ?? []).flatMap(d => dirItems(d.scope, d.path));
+  const fileList = (specs, read) => specs.map(s =>
+    ({ scope: s.scope, label: s.label, path: files[s.key], ...read(files[s.key]) }));
 
   const sources = {
-    memory,
+    memory: fileList(provider.memoryFiles, textItem),
     rules: collectDirs('rules'),
     agents: collectDirs('agents'),
     commands: collectDirs('commands'),
     skills: collectDirs('skills'),
     outputStyles: collectDirs('outputStyles'),
-    mcp,
-    hooks: hooksFromLayers(layers),
-    plugins: pluginsFromLayers(layers),
+    mcp: fileList(provider.mcpFiles, jsonItem),
+    hooks: fromLayers(layers, s => s.hooks),
+    plugins: fromLayers(layers, s => s.enabledPlugins),
     keybindings: { path: files.keybindings, ...jsonItem(files.keybindings) },
     worktreeInclude: { path: files.worktreeInclude, ...textItem(files.worktreeInclude) },
-    env: pickEnv(ctx.env ?? {}),
+    env: pickEnv(ctx.env ?? {}, provider.env),
   };
 
   return {
+    provider: { id: provider.id, label: provider.label },
     machine: {
       hostname: ctx.hostname ?? safeHostname(),
       platform: ctx.platform,
-      cwd: ctx.projectDir,
       projectDir: ctx.projectDir,
       timestamp: ctx.now ?? new Date().toISOString(),
     },
     layers, scopes, sources,
   };
-}
-
-function textItem(path) { const r = readText(path); return { present: r.present, parse: r.present ? 'ok' : 'missing', error: r.error, data: r.data }; }
-function jsonItem(path) { const r = readJson(path); return { present: r.present, parse: r.parse, error: r.error, data: r.data }; }
-function safeHostname() { try { return hostname(); } catch { return 'unknown'; } }
-
-// Hooks declared inside any settings layer.
-function hooksFromLayers(layers) {
-  const out = [];
-  for (const l of layers) {
-    for (const event of Object.keys(l.settings.hooks ?? {})) {
-      out.push({ scope: l.scope, label: event, path: l.source, present: true, parse: 'ok', error: null, data: l.settings.hooks[event] });
-    }
-  }
-  return out;
-}
-
-// enabledPlugins map declared in any settings layer.
-function pluginsFromLayers(layers) {
-  const out = [];
-  for (const l of layers) {
-    for (const [name, enabled] of Object.entries(l.settings.enabledPlugins ?? {})) {
-      out.push({ scope: l.scope, label: name, path: l.source, present: true, parse: 'ok', error: null, data: { enabled } });
-    }
-  }
-  return out;
 }

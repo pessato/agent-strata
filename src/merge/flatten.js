@@ -1,15 +1,21 @@
-// flatten(obj) → [{ path, value, isArray }]
+// flatten(obj) → [{ path, segments, key, value, isArray }]
 // Plain objects recurse; arrays and scalars are leaves.
-export function flatten(obj, prefix = '') {
+//
+// `segments` is the authoritative path — `path` is only for display and map
+// keying. A settings key may itself contain a dot (an MCP server named
+// `my.server`, say), so splitting the joined string back apart would nest it
+// wrongly on the way out.
+export function flatten(obj, segments = []) {
   const out = [];
   for (const [key, value] of Object.entries(obj ?? {})) {
-    const path = prefix ? `${prefix}.${key}` : key;
+    const next = [...segments, key];
+    const leaf = { path: next.join('.'), segments: next, key, value };
     if (Array.isArray(value)) {
-      out.push({ path, value, isArray: true });
+      out.push({ ...leaf, isArray: true });
     } else if (value && typeof value === 'object') {
-      out.push(...flatten(value, path));
+      out.push(...flatten(value, next));
     } else {
-      out.push({ path, value, isArray: false });
+      out.push({ ...leaf, isArray: false });
     }
   }
   return out;

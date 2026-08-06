@@ -1,42 +1,61 @@
 import { flatten } from './flatten.js';
-import { rank } from '../precedence.js';
+import { redactValue } from '../redact.js';
 
-// mergeConfig(layers) → { effective, leaves }
-export function mergeConfig(layers) {
-  // Collect every leaf occurrence across layers, tagged with its scope/source.
-  const byPath = new Map(); // path → { isArray, occurrences:[{scope,source,value}] }
+// mergeConfig(layers, provider) → { effective, leaves }
+//
+// Values are redacted here rather than at render time so that nothing
+// downstream — the HTML, the effective tree, a future JSON output — can leak a
+// credential by forgetting to ask.
+export function mergeConfig(layers, provider) {
+  const rank = scope => provider.rank(scope);
+
+  // Keyed by the segment array, not the joined path: `{a:{b:1}}` and
+  // `{"a.b":1}` render the same string but are different settings.
+  const bySegments = new Map();
   for (const layer of layers) {
     for (const leaf of flatten(layer.settings)) {
-      const slot = byPath.get(leaf.path) ?? { isArray: leaf.isArray, occurrences: [] };
+      const id = JSON.stringify(leaf.segments);
+      const slot = bySegments.get(id) ??
+        { path: leaf.path, segments: leaf.segments, key: leaf.key, isArray: leaf.isArray, occurrences: [] };
       slot.isArray = slot.isArray || leaf.isArray;
-      slot.occurrences.push({ scope: layer.scope, source: layer.source, value: leaf.value });
-      byPath.set(leaf.path, slot);
+      slot.occurrences.push({
+        scope: layer.scope,
+        source: layer.source,
+        value: redactValue(leaf.key, leaf.value),
+      });
+      bySegments.set(id, slot);
     }
   }
 
   const leaves = [];
-  for (const [path, slot] of byPath) {
-    leaves.push(slot.isArray
-      ? mergeArray(path, slot.occurrences)
-      : mergeScalar(path, slot.occurrences));
+  for (const slot of bySegments.values()) {
+    leaves.push(slot.isArray ? mergeArray(slot, rank) : mergeScalar(slot, rank));
   }
 
-  const effective = rebuildEffective(leaves);
-  return { effective, leaves };
+  return { effective: rebuildEffective(leaves), leaves };
 }
 
-function mergeScalar(path, occurrences) {
-  const sorted = [...occurrences].sort((a, b) => rank(a.scope) - rank(b.scope));
+function base(slot) {
+  return { path: slot.path, segments: slot.segments, key: slot.key };
+}
+
+function mergeScalar(slot, rank) {
+  const sorted = [...slot.occurrences].sort((a, b) => rank(a.scope) - rank(b.scope));
   const win = sorted[0];
   const overrides = sorted.slice(1).map(o => ({ scope: o.scope, value: o.value, source: o.source }));
-  return { path, type: 'scalar', winner: win.scope, value: win.value, locked: win.scope === 'managed', overrides };
+  return {
+    ...base(slot), type: 'scalar',
+    winner: win.scope, value: win.value, locked: win.scope === 'managed', overrides,
+  };
 }
 
-function mergeArray(path, occurrences) {
-  const isDeny = path.endsWith('.deny');
+function mergeArray(slot, rank) {
+  // `permissions.deny` under managed policy cannot be relaxed by a weaker scope,
+  // so those entries are flagged as locked.
+  const isDeny = slot.key === 'deny';
   const seen = new Map(); // json(value) → entry (kept = strongest scope)
   // Strongest first so the first writer of a value wins the dedupe.
-  const sorted = [...occurrences].sort((a, b) => rank(a.scope) - rank(b.scope));
+  const sorted = [...slot.occurrences].sort((a, b) => rank(a.scope) - rank(b.scope));
   for (const occ of sorted) {
     // Tolerate a value that is a scalar in one layer and an array in another:
     // treat a non-array occurrence as a single-element array so we never iterate
@@ -51,7 +70,7 @@ function mergeArray(path, occurrences) {
       });
     }
   }
-  return { path, type: 'array', winner: null, entries: [...seen.values()] };
+  return { ...base(slot), type: 'array', winner: null, entries: [...seen.values()] };
 }
 
 // Build a nested object from scalar/array leaf effective values.
@@ -59,10 +78,14 @@ function rebuildEffective(leaves) {
   const root = {};
   for (const leaf of leaves) {
     const value = leaf.type === 'array' ? leaf.entries.map(e => e.value) : leaf.value;
-    const parts = leaf.path.split('.');
     let node = root;
-    for (let i = 0; i < parts.length - 1; i++) node = (node[parts[i]] ??= {});
-    node[parts.at(-1)] = value;
+    for (const seg of leaf.segments.slice(0, -1)) {
+      // A scalar already parked here (one layer sets `a`, another sets `a.b`)
+      // would otherwise be silently indexed into.
+      if (!node[seg] || typeof node[seg] !== 'object') node[seg] = {};
+      node = node[seg];
+    }
+    node[leaf.segments.at(-1)] = value;
   }
   return root;
 }
