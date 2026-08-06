@@ -1,10 +1,27 @@
 {
-  "name": "claude-config-view",
+  "name": "agent-strata",
   "version": "0.1.0",
-  "description": "Read-only viewer for all Claude Code configuration scopes and how they merge.",
+  "description": "See every layer of your coding agent's configuration, and which one actually wins.",
   "type": "module",
-  "bin": { "claude-config-view": "bin/cli.js" },
-  "scripts": { "test": "node --test" },
-  "engines": { "node": ">=18" },
-  "license": "MIT"
+  "bin": { "agent-strata": "bin/cli.js" },
+  "files": ["bin", "src", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test",
+    "prepublishOnly": "node --test"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "config",
+    "settings",
+    "precedence",
+    "cli",
+    "devtools"
+  ],
+  "author": "pessato",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/pessato/agent-strata.git" },
+  "bugs": { "url": "https://github.com/pessato/agent-strata/issues" },
+  "homepage": "https://github.com/pessato/agent-strata#readme",
+  "engines": { "node": ">=18" }
 }
