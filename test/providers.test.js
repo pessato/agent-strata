@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { resolveProvider, PROVIDER_IDS } from '../src/providers/index.js';
 import { provider } from './helpers.js';
 
@@ -38,9 +39,10 @@ test('macOS, linux and windows resolve different managed paths', () => {
 
 test('user and project settings paths follow the documented layout', () => {
   const p = provider.settingsPaths({ platform: 'darwin', home: '/Users/x', projectDir: '/proj' });
-  assert.equal(p.user, '/Users/x/.claude/settings.json');
-  assert.equal(p['project-shared'], '/proj/.claude/settings.json');
-  assert.equal(p['project-local'], '/proj/.claude/settings.local.json');
+  // Compared via join() so the assertion holds on Windows separators too.
+  assert.equal(p.user, join('/Users/x', '.claude', 'settings.json'));
+  assert.equal(p['project-shared'], join('/proj', '.claude', 'settings.json'));
+  assert.equal(p['project-local'], join('/proj', '.claude', 'settings.local.json'));
 });
 
 test('every scope carries the fields the reporter needs', () => {

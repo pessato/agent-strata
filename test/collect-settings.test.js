@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { collectSettings } from '../src/collector/index.js';
-import { provider } from './helpers.js';
+import { provider, NO_CHMOD } from './helpers.js';
 
 function makeHome() {
   const home = mkdtempSync(join(tmpdir(), 'home-'));
@@ -48,7 +48,7 @@ test('a malformed layer is reported and excluded from the merge', () => {
   assert.equal(layers.some(l => l.scope === 'project-shared'), false);
 });
 
-test('an unreadable layer is not misreported as absent', { skip: process.getuid?.() === 0 }, () => {
+test('an unreadable layer is not misreported as absent', { skip: NO_CHMOD }, () => {
   const proj = mkdtempSync(join(tmpdir(), 'proj-'));
   mkdirSync(join(proj, '.claude'), { recursive: true });
   const f = join(proj, '.claude', 'settings.json');

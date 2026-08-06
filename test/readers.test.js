@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readJson, readText, listDir } from '../src/collector/readers.js';
+import { NO_CHMOD } from './helpers.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'strata-'));
 writeFileSync(join(dir, 'ok.json'), '{"model":"opus"}');
@@ -21,7 +22,7 @@ test('readJson reports ok / missing / malformed', () => {
 });
 
 test('a file that exists but cannot be read is unreadable, not missing',
-  { skip: process.getuid?.() === 0 }, () => {
+  { skip: NO_CHMOD }, () => {
     const f = join(dir, 'locked.json');
     writeFileSync(f, '{"a":1}');
     chmodSync(f, 0o000);
