@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "agent-strata",
+      "changelog-path": "CHANGELOG.md",
+      "release-as": "0.0.1",
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "refactor", "section": "Internal Changes" },
+        { "type": "docs", "section": "Documentation" },
+        { "type": "test", "hidden": true },
+        { "type": "chore", "hidden": true },
+        { "type": "ci", "hidden": true },
+        { "type": "build", "hidden": true },
+        { "type": "style", "hidden": true }
+      ]
+    }
+  }
+}
