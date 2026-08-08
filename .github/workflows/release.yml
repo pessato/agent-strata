@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+# Nothing is granted by default; each job asks for exactly what it needs.
+permissions: {}
+
+jobs:
+  # Maintains an open "chore: release x.y.z" PR reflecting every commit landed on
+  # main since the last tag. Merging that PR is what cuts a release: this step
+  # then tags it and publishes the GitHub Release.
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Only runs on the push that merged a release PR. A release created by
+  # GITHUB_TOKEN cannot trigger a separate `on: release` workflow, so publishing
+  # has to hang off this output rather than live in its own file.
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mints the OIDC token npm signs provenance with
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      - run: node --test
+      # --access public is explicit: it is the default for unscoped packages,
+      # but npm has shipped bugs where --provenance fails to apply that default.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -7,7 +7,7 @@ Claude Code reads settings from five places on your machine. When it does someth
 `agent-strata` does that merge and hands you the answer as a single HTML page: every effective setting, which layer set it, and what that layer overrode to get there.
 
 ```bash
-npx github:pessato/agent-strata --open
+npx agent-strata --open
 ```
 
 No install, no config, nothing written to your machine except the report.
@@ -55,7 +55,7 @@ agent-strata [options]
 Install it properly if you'll use it more than once:
 
 ```bash
-npm i -g github:pessato/agent-strata
+npm i -g agent-strata
 ```
 
 ## Safety
@@ -81,5 +81,8 @@ Codex support is the next one planned.
 ```bash
 node --test
 ```
+
+Releases are cut from Conventional Commits — see [RELEASING.md](RELEASING.md) and the
+[changelog](CHANGELOG.md).
 
 MIT licensed.
